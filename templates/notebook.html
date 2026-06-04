@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>記事本 - 校網搜尋系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white min-h-screen flex flex-col">
+    <!-- 導航欄 -->
+    <div class="w-full flex justify-center pt-2 z-50">
+        <div class="flex border border-gray-300 rounded-full overflow-hidden">
+            <a href="/" class="toggle-tab w-24 px-3 py-2 bg-gray-200 text-gray-700 font-semibold text-sm text-center">首頁</a>
+            <button id="notebook-tab" class="toggle-tab w-24 px-3 py-2 bg-blue-500 text-white font-semibold text-sm">記事本</button>
+        </div>
+    </div>
+
+    <!-- 定選內容按鈕 -->
+    <div class="absolute top-2 left-4 z-50">
+        <button id="pinned-toggle" class="flex items-center text-gray-700 hover:text-gray-900 focus:outline-none h-10">
+            <svg id="pinned-arrow" class="h-4 w-4 transform transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            <span class="ml-2 text-sm">定選內容</span>
+        </button>
+        <div id="pinned-items" class="hidden absolute top-10 left-0 w-80 bg-white border border-gray-200 shadow-lg rounded-md p-4 max-h-96 overflow-y-auto z-10">
+            <h2 class="text-lg font-bold mb-2">已定選的內容</h2>
+            <div id="pinned-list" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- 登入/登出按鈕 -->
+    <div class="absolute top-2 right-4 z-50">
+        {% if user %}
+            <div class="flex items-center space-x-3">
+<!--                 <span class="text-gray-700 text-sm h-10 flex items-center">歡迎, {{ user.name }}</span> -->
+                <a href="/logout" class="inline-block">
+                    <button class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center space-x-1 transition duration-300 text-sm h-10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
+                        </svg>
+                        <span>登出</span>
+                    </button>
+                </a>
+            </div>
+        {% else %}
+            <a href="/login-page" class="inline-block">
+                <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center space-x-1 transition duration-300 text-sm h-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
+                    <span>登入</span>
+                </button>
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- 主要內容區域 -->
+    <div class="flex-grow flex flex-col items-center pt-16 p-4">
+        <div class="text-center mb-6">
+            <h1 class="text-6xl font-bold mb-8" style="font-family: '微軟正黑體', sans-serif;">記事本</h1>
+        </div>
+
+        <!-- 群組選擇 -->
+        <div class="w-full max-w-2xl mb-6">
+            <label for="group-select" class="block text-gray-700 text-sm font-bold mb-2">選擇群組</label>
+            <select id="group-select" class="w-full border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">所有群組</option>
+            </select>
+        </div>
+
+        <!-- 訊息顯示區域 -->
+        <div id="message-results" class="w-full max-w-2xl mt-6">
+            <div id="message-list" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- JavaScript 功能 -->
+    <script>
+        // 展開/收起定選內容
+        const pinnedToggle = document.getElementById('pinned-toggle');
+        const pinnedItems = document.getElementById('pinned-items');
+        const pinnedArrow = document.getElementById('pinned-arrow');
+
+        pinnedToggle.addEventListener('click', () => {
+            pinnedItems.classList.toggle('hidden');
+            pinnedArrow.classList.toggle('rotate-180');
+            loadPinnedItems();
+        });
+
+        // 載入群組選項
+        async function loadGroups() {
+            const groupSelect = document.getElementById('group-select');
+            try {
+                const response = await fetch('/api/messages?groups_only=true', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    groupSelect.innerHTML = '<option value="">所有群組</option>';
+                    data.groups.forEach(group => {
+                        const option = document.createElement('option');
+                        option.value = group.group_id;
+                        option.textContent = group.group_name || '未命名群組';
+                        groupSelect.appendChild(option);
+                    });
+                } else {
+                    console.error('載入群組失敗:', data.error);
+                }
+            } catch (error) {
+                console.error('載入群組錯誤:', error);
+            }
+        }
+
+        // 載入訊息
+        async function loadMessages(groupId = '') {
+            const messageList = document.getElementById('message-list');
+            messageList.innerHTML = '<p class="text-gray-500">正在載入...</p>';
+
+            try {
+                const url = groupId ? `/api/messages?group_id=${encodeURIComponent(groupId)}` : '/api/messages';
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageList.innerHTML = '';
+                    if (data.messages.length === 0) {
+                        messageList.innerHTML = '<p class="text-yellow-500">未找到訊息！</p>';
+                    } else {
+                        data.messages.forEach(message => {
+                            const messageItem = document.createElement('div');
+                            messageItem.className = 'border rounded-lg p-4 bg-gray-50';
+                            
+                            // 只有在選擇"所有群組"時才顯示群組資訊
+                            const showGroupInfo = !groupId && message.group_id;
+                            
+                            messageItem.innerHTML = `
+                                <p><strong>類別:</strong> ${message.category || '無'}</p>
+                                <p><strong>日期:</strong> ${message.date || '無'}</p>
+                                <p><strong>事項:</strong> ${message.event || '無'}</p>
+                                <p><strong>備註:</strong> ${message.notes || '無'}</p>
+                                <p><strong>地點:</strong> ${message.location || '無'}</p>
+                                ${showGroupInfo ? `<p><strong>群組:</strong> ${message.group_name}</p>` : ''}
+                            `;
+                            messageList.appendChild(messageItem);
+                        });
+                    }
+                } else {
+                    messageList.innerHTML = `<p class="text-red-500">錯誤: ${data.error}</p>`;
+                }
+            } catch (error) {
+                messageList.innerHTML = '<p class="text-red-500">載入訊息失敗，請稍後再試！</p>';
+            }
+        }
+
+        // 載入已定選的內容
+        async function loadPinnedItems() {
+            const pinnedList = document.getElementById('pinned-list');
+            try {
+                const response = await fetch('/get_pinned', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    pinnedList.innerHTML = '';
+                    if (data.pinned.length === 0) {
+                        pinnedList.innerHTML = '<p class="text-gray-500 text-sm">尚未定選任何內容！</p>';
+                    } else {
+                        data.pinned.forEach(item => {
+                            const pinnedItem = document.createElement('div');
+                            pinnedItem.className = 'border-b py-2 flex items-center';
+                            pinnedItem.innerHTML = `
+                                <button class="unpin-button mr-2" data-info="${item.info}" data-url="${item.url}">
+                                    <img src="/static/pinned.png" alt="Unpin" class="h-5 w-5">
+                                </button>
+                                <p class="text-blue-500 hover:underline text-sm">
+                                    <a href="${item.url}" target="_blank">
+                                        ${item.info}
+                                    </a>
+                                </p>
+                            `;
+                            pinnedList.appendChild(pinnedItem);
+                        });
+
+                        document.querySelectorAll('.unpin-button').forEach(button => {
+                            button.addEventListener('click', async () => {
+                                const info = button.getAttribute('data-info');
+                                const url = button.getAttribute('data-url');
+                                try {
+                                    const response = await fetch('/unpin', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({ info, url }),
+                                    });
+                                    const result = await response.json();
+                                    if (response.ok) {
+                                        await loadPinnedItems();
+                                    } else {
+                                        alert(`移除失敗：${result.error}`);
+                                    }
+                                } catch (error) {
+                                    alert('移除失敗，請稍後再試！');
+                                }
+                            });
+                        });
+                    }
+                } else {
+                    pinnedList.innerHTML = `<p class="text-red-500 text-sm">錯誤: ${data.error}</p>`;
+                }
+            } catch (error) {
+                pinnedList.innerHTML = '<p class="text-red-500 text-sm">無法載入定選內容，請稍後再試！</p>';
+            }
+        }
+
+        // 群組選擇事件
+        document.getElementById('group-select').addEventListener('change', (event) => {
+            const groupId = event.target.value;
+            loadMessages(groupId);
+        });
+
+        // 頁面加載時初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadGroups();
+            await loadMessages();
+            await loadPinnedItems();
+        });
+    </script>
+</body>
+</html>

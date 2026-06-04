@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校網搜尋系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white min-h-screen flex flex-col">
+    <!-- 調整切換導航欄按鈕高度與位置 -->
+    <div class="w-full flex justify-center pt-2 z-50">
+        <div class="flex border border-gray-300 rounded-full overflow-hidden">
+            <button id="home-tab" class="toggle-tab w-24 px-3 py-2 bg-blue-500 text-white font-semibold text-sm focus:outline-none">首頁</button>
+            <a href="/notebook" id="notebook-tab" class="toggle-tab w-24 px-3 py-2 bg-gray-200 text-gray-700 font-semibold text-sm text-center">記事本</a>
+        </div>
+    </div>
+
+    <!-- 調整左上角定選按鈕位置與高度 -->
+    <div class="absolute top-2 left-4 z-50">
+        <button id="pinned-toggle" class="flex items-center text-gray-700 hover:text-gray-900 focus:outline-none h-10">
+            <svg id="pinned-arrow" class="h-4 w-4 transform transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            <span class="ml-2 text-sm">定選內容</span>
+        </button>
+        <div id="pinned-items" class="hidden absolute top-10 left-0 w-80 bg-white border border-gray-200 shadow-lg rounded-md p-4 max-h-96 overflow-y-auto z-10">
+            <h2 class="text-lg font-bold mb-2">已定選的內容</h2>
+            <div id="pinned-list" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- 調整右上角登入/登出按鈕位置 -->
+    <div class="absolute top-2 right-4 z-50">
+        {% if user %}
+            <div class="flex items-center space-x-3">
+<!--                 <span class="text-gray-700 text-sm h-10 flex items-center">歡迎, {{ user.name }}</span> -->
+                <a href="/logout" class="inline-block">
+                    <button class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center space-x-1 transition duration-300 text-sm h-10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
+                        </svg>
+                        <span>登出</span>
+                    </button>
+                </a>
+            </div>
+        {% else %}
+            <a href="/login-page" class="inline-block">
+                <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md flex items-center justify-center space-x-1 transition duration-300 text-sm h-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
+                    <span>登入</span>
+                </button>
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- 主要內容區域 -->
+    <div class="flex-grow flex flex-col items-center pt-16 p-4">
+        <div class="text-center mb-6">
+            <h1 class="text-6xl font-bold mb-8" style="font-family: '微軟正黑體', sans-serif;">校網搜尋系統</h1>
+        </div>
+        
+        <!-- 搜尋框 -->
+        <div class="w-full max-w-2xl">
+            <div class="relative">
+                <div class="flex items-center border border-gray-300 rounded-full px-4 py-2 hover:shadow-md focus-within:shadow-md transition-shadow">
+                    <div class="text-gray-400 mr-3">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                    <input type="text" 
+                           id="search-input"
+                           class="w-full focus:outline-none" 
+                           placeholder="搜尋...">
+                    <div class="flex items-center">
+                        <button id="search-button" class="text-blue-500 ml-2">
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 18v-12"></path>
+                                <path d="M8 12l4-4 4 4"></path>
+                            </svg>
+                        </button>
+                        <button class="text-blue-500 ml-3">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" stroke="#4285F4" stroke-width="2"/>
+                                <path d="M12 17l0 -6" stroke="#4285F4" stroke-width="2"/>
+                                <path d="M12 7l.01 0" stroke="#4285F4" stroke-width="2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 搜尋結果顯示區域 -->
+        <div id="search-results" class="w-full max-w-2xl mt-6"></div>
+    </div>
+
+<!-- JavaScript 搜尋功能 -->
+<script>
+    // 展開/收起定選內容
+    const pinnedToggle = document.getElementById('pinned-toggle');
+    const pinnedItems = document.getElementById('pinned-items');
+    const pinnedArrow = document.getElementById('pinned-arrow');
+
+    pinnedToggle.addEventListener('click', () => {
+        pinnedItems.classList.toggle('hidden');
+        pinnedArrow.classList.toggle('rotate-180');
+    });
+
+    // 首頁按鈕點擊效果
+    const homeTab = document.getElementById('home-tab');
+    const notebookTab = document.getElementById('notebook-tab');
+
+    homeTab.addEventListener('click', () => {
+        homeTab.classList.add('bg-blue-500', 'text-white');
+        homeTab.classList.remove('bg-gray-200', 'text-gray-700');
+        notebookTab.classList.add('bg-gray-200', 'text-gray-700');
+        notebookTab.classList.remove('bg-blue-500', 'text-white');
+    });
+
+    // 搜尋功能
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+
+    // 按 Enter 鍵觸發搜尋
+    searchInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            searchButton.click();
+        }
+    });
+
+    searchButton.addEventListener('click', async () => {
+        const query = searchInput.value.trim();
+        const resultsDiv = document.getElementById('search-results');
+
+        if (!query) {
+            resultsDiv.innerHTML = '<p class="text-red-500">請輸入搜尋內容！</p>';
+            return;
+        }
+
+        resultsDiv.innerHTML = '<p class="text-gray-500">正在搜尋...</p>';
+
+        try {
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                resultsDiv.innerHTML = '';
+                if (data.results.length === 0) {
+                    resultsDiv.innerHTML = '<p class="text-yellow-500">未找到相關結果！</p>';
+                } else {
+                    // 檢查每個搜尋結果是否已定選
+                    for (const result of data.results) {
+                        const info = result.metadata.text || '無文字內容';
+                        const url = result.metadata.Link || '#';
+                        let isPinned = false;
+
+                        // 發送請求檢查是否已定選
+                        const checkResponse = await fetch('/check_pinned', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ info, url }),
+                        });
+                        const checkData = await checkResponse.json();
+
+                        if (checkResponse.ok && checkData.exists) {
+                            isPinned = true;
+                        }
+
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'border-b py-2 flex items-center';
+                        resultItem.innerHTML = `
+                            <button class="pin-button mr-2" data-info="${info}" data-url="${url}" data-pinned="${isPinned}">
+                                <img src="/static/${isPinned ? 'pinned.png' : 'pin.png'}" alt="Pin" class="h-5 w-5 pin-image">
+                            </button>
+                            <p class="text-blue-500 hover:underline">
+                                <a href="${url}" target="_blank">
+                                    ${info}
+                                </a>
+                            </p>
+                        `;
+                        resultsDiv.appendChild(resultItem);
+                    }
+
+                    // 為每個 pin 按鈕添加事件監聽器
+                    document.querySelectorAll('.pin-button').forEach(button => {
+                        button.addEventListener('click', async () => {
+                            const isPinned = button.getAttribute('data-pinned') === 'true';
+                            const img = button.querySelector('.pin-image');
+                            const info = button.getAttribute('data-info');
+                            const url = button.getAttribute('data-url');
+
+                            if (!isPinned) {
+                                // 未定選，執行定選操作
+                                try {
+                                    const response = await fetch('/pin', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({ info, url }),
+                                    });
+
+                                    const result = await response.json();
+
+                                    if (response.ok) {
+                                        img.src = '/static/pinned.png';
+                                        button.setAttribute('data-pinned', 'true');
+                                    } else {
+                                        alert(`儲存失敗：${result.error}`);
+                                    }
+                                } catch (error) {
+                                    alert('儲存失敗，請稍後再試！');
+                                }
+                            } else {
+                                // 已定選，執行取消定選操作
+                                try {
+                                    const response = await fetch('/unpin', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({ info, url }),
+                                    });
+
+                                    const result = await response.json();
+
+                                    if (response.ok) {
+                                        img.src = '/static/pin.png';
+                                        button.setAttribute('data-pinned', 'false');
+                                    } else {
+                                        alert(`移除失敗：${result.error}`);
+                                    }
+                                } catch (error) {
+                                    alert('移除失敗，請稍後再試！');
+                                }
+                            }
+
+                            // 重新載入已定選的內容
+                            await loadPinnedItems();
+                        });
+                    });
+                }
+            } else {
+                resultsDiv.innerHTML = `<p class="text-red-500">錯誤: ${data.error}</p>`;
+            }
+        } catch (error) {
+            resultsDiv.innerHTML = '<p class="text-red-500">搜尋失敗，請稍後再試！</p>';
+        }
+    });
+
+    // 函數：重新載入已定選的內容
+    async function loadPinnedItems() {
+        const pinnedList = document.getElementById('pinned-list');
+
+        try {
+            const response = await fetch('/get_pinned', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                pinnedList.innerHTML = '';
+                if (data.pinned.length === 0) {
+                    pinnedList.innerHTML = '<p class="text-gray-500 text-sm">尚未定選任何內容！</p>';
+                } else {
+                    data.pinned.forEach(item => {
+                        const pinnedItem = document.createElement('div');
+                        pinnedItem.className = 'border-b py-2 flex items-center';
+                        pinnedItem.innerHTML = `
+                            <button class="unpin-button mr-2" data-info="${item.info}" data-url="${item.url}">
+                                <img src="/static/pinned.png" alt="Unpin" class="h-5 w-5">
+                            </button>
+                            <p class="text-blue-500 hover:underline text-sm">
+                                <a href="${item.url}" target="_blank">
+                                    ${item.info}
+                                </a>
+                            </p>
+                        `;
+                        pinnedList.appendChild(pinnedItem);
+                    });
+
+                    // 為每個 unpin 按鈕添加事件監聽器
+                    document.querySelectorAll('.unpin-button').forEach(button => {
+                        button.addEventListener('click', async () => {
+                            const info = button.getAttribute('data-info');
+                            const url = button.getAttribute('data-url');
+
+                            try {
+                                const response = await fetch('/unpin', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ info, url }),
+                                });
+
+                                const result = await response.json();
+
+                                if (response.ok) {
+                                    // 重新載入已定選的內容
+                                    await loadPinnedItems();
+
+                                    // 更新搜尋結果中的對應按鈕狀態
+                                    const searchButtons = document.querySelectorAll('.pin-button');
+                                    searchButtons.forEach(searchButton => {
+                                        const searchInfo = searchButton.getAttribute('data-info');
+                                        const searchUrl = searchButton.getAttribute('data-url');
+                                        if (searchInfo === info && searchUrl === url) {
+                                            const img = searchButton.querySelector('.pin-image');
+                                            img.src = '/static/pin.png';
+                                            searchButton.setAttribute('data-pinned', 'false');
+                                        }
+                                    });
+                                } else {
+                                    alert(`移除失敗：${result.error}`);
+                                }
+                            } catch (error) {
+                                alert('移除失敗，請稍後再試！');
+                            }
+                        });
+                    });
+                }
+            } else {
+                pinnedList.innerHTML = `<p class="text-red-500 text-sm">錯誤: ${data.error}</p>`;
+            }
+        } catch (error) {
+            pinnedList.innerHTML = '<p class="text-red-500 text-sm">無法載入定選內容，請稍後再試！</p>';
+        }
+    }
+
+    // 頁面加載時獲取已定選的內容
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadPinnedItems();
+    });
+</script>
+</body>
+</html>
